@@ -45,7 +45,7 @@ for col in df.columns:
             else:
                 df[col] = df[col].fillna(df[col].mode()[0])
 
-    return df
+     return df
 
 df = load_data()
 
