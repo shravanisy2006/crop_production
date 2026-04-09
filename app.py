@@ -12,62 +12,78 @@ from sklearn.cluster import KMeans
 
 # -------------------- PAGE CONFIG --------------------
 st.set_page_config(page_title="Crop Dashboard", layout="wide")
-
 st.title("🌾 Crop Production Analytics Dashboard")
 
 # -------------------- LOAD DATA SAFELY --------------------
 @st.cache_data
 def load_data():
-    file_path = os.path.join(os.path.dirname(__file__), "crop_production.csv")
-    df = pd.read_csv(file_path)
-
-    # Remove duplicates
-    df.drop_duplicates(inplace=True)
-
-    # Convert numeric-like columns safely
-    # NEW ✅
-for col in df.columns:
     try:
-        df[col] = pd.to_numeric(df[col])
-    except:
-        pass
+        file_path = os.path.join(os.path.dirname(__file__), "crop_production.csv")
+        df = pd.read_csv(file_path)
+    except Exception as e:
+        st.error(f"Error loading dataset: {e}")
+        return pd.DataFrame()
 
-    # Handle missing values safely
-    for col in df.columns:
-        if pd.api.types.is_numeric_dtype(df[col]):
-            if df[col].isnull().all():
-                df[col] = df[col].fillna(0)
-            else:
-                df[col] = df[col].fillna(df[col].mean())
-        else:
-            if df[col].isnull().all():
-                df[col] = df[col].fillna("Unknown")
-            else:
-                df[col] = df[col].fillna(df[col].mode()[0])
+    try:
+        # Remove duplicates
+        df.drop_duplicates(inplace=True)
 
-            return df
+        # Safe type conversion (NO pandas errors)
+        for col in df.columns:
+            try:
+                df[col] = pd.to_numeric(df[col])
+            except:
+                pass
+
+        # Handle missing values safely
+        for col in df.columns:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                if df[col].isnull().all():
+                    df[col] = df[col].fillna(0)
+                else:
+                    df[col] = df[col].fillna(df[col].mean())
+            else:
+                if df[col].isnull().all():
+                    df[col] = df[col].fillna("Unknown")
+                else:
+                    df[col] = df[col].fillna(df[col].mode()[0])
+
+    except Exception as e:
+        st.error(f"Data cleaning error: {e}")
+
+    return df   # ✅ CORRECTLY INSIDE FUNCTION
+
 
 df = load_data()
 
-# -------------------- SUMMARY (Exp 6) --------------------
+# -------------------- EMPTY DATA CHECK --------------------
+if df.empty:
+    st.warning("⚠️ Dataset is empty or failed to load.")
+    st.stop()
+
+# -------------------- SUMMARY --------------------
 st.subheader("📊 Summary Statistics")
 
-col1, col2, col3 = st.columns(3)
+try:
+    col1, col2, col3 = st.columns(3)
 
-col1.metric("Total Records", len(df))
+    col1.metric("Total Records", len(df))
 
-if "Production" in df.columns:
-    col2.metric("Average Production", round(df["Production"].mean(), 2))
-    col3.metric("Max Production", df["Production"].max())
-else:
-    col2.metric("Average Production", "N/A")
-    col3.metric("Max Production", "N/A")
+    if "Production" in df.columns:
+        col2.metric("Average Production", round(df["Production"].mean(), 2))
+        col3.metric("Max Production", df["Production"].max())
+    else:
+        col2.metric("Average Production", "N/A")
+        col3.metric("Max Production", "N/A")
+
+except Exception as e:
+    st.error(f"Summary Error: {e}")
 
 # -------------------- DATA TABLE --------------------
 st.subheader("📋 Dataset Preview")
 st.dataframe(df.head(100))
 
-# -------------------- ADD DATA (Exp 7) --------------------
+# -------------------- ADD DATA --------------------
 st.subheader("➕ Add New Record")
 
 with st.form("add_form"):
@@ -93,14 +109,14 @@ with st.form("add_form"):
                 "Production": production
             }])
 
-            df = pd.concat([df, new_row], ignore_index=True)
-            df.to_csv("crop_production.csv", index=False)
+            df_new = pd.concat([df, new_row], ignore_index=True)
+            df_new.to_csv("crop_production.csv", index=False)
 
-            st.success("✅ Data Added Successfully! Please refresh.")
+            st.success("✅ Data Added! Please refresh.")
         except Exception as e:
-            st.error(f"Error adding data: {e}")
+            st.error(f"Add Data Error: {e}")
 
-# -------------------- EDA (Exp 8) --------------------
+# -------------------- VISUALIZATION --------------------
 st.subheader("📈 Visualizations")
 
 if st.button("Generate Graphs"):
@@ -116,7 +132,7 @@ if st.button("Generate Graphs"):
             sns.boxplot(x=numeric_df["Production"], ax=ax2)
             st.pyplot(fig2)
 
-        if len(numeric_df.columns) > 1:
+        if numeric_df.shape[1] > 1:
             fig3, ax3 = plt.subplots()
             sns.heatmap(numeric_df.corr(), annot=True, ax=ax3)
             st.pyplot(fig3)
@@ -124,7 +140,7 @@ if st.button("Generate Graphs"):
     except Exception as e:
         st.error(f"Visualization Error: {e}")
 
-# -------------------- REGRESSION (Exp 11) --------------------
+# -------------------- REGRESSION --------------------
 st.subheader("📉 Regression Analysis")
 
 if st.button("Run Regression"):
@@ -140,10 +156,11 @@ if st.button("Run Regression"):
             st.success(f"R² Score: {round(r2, 3)}")
         else:
             st.warning("Required columns not found.")
+
     except Exception as e:
         st.error(f"Regression Error: {e}")
 
-# -------------------- PCA (Exp 12) --------------------
+# -------------------- PCA --------------------
 st.subheader("📊 PCA Analysis")
 
 if st.button("Run PCA"):
@@ -165,10 +182,11 @@ if st.button("Run PCA"):
             st.pyplot(fig)
         else:
             st.warning("Required columns not found.")
+
     except Exception as e:
         st.error(f"PCA Error: {e}")
 
-# -------------------- CLUSTERING (Exp 13) --------------------
+# -------------------- CLUSTERING --------------------
 st.subheader("🔵 Clustering (K-Means)")
 
 if st.button("Run Clustering"):
@@ -180,12 +198,13 @@ if st.button("Run Clustering"):
             df["Cluster"] = kmeans.fit_predict(X)
 
             fig, ax = plt.subplots()
-            scatter = ax.scatter(df["Area"], df["Production"], c=df["Cluster"])
+            ax.scatter(df["Area"], df["Production"], c=df["Cluster"])
             ax.set_title("K-Means Clustering")
             st.pyplot(fig)
 
             st.dataframe(df[["Area", "Production", "Cluster"]].head())
         else:
             st.warning("Required columns not found.")
+
     except Exception as e:
         st.error(f"Clustering Error: {e}")
