@@ -25,8 +25,12 @@ def load_data():
     df.drop_duplicates(inplace=True)
 
     # Convert numeric-like columns safely
-    for col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors='ignore')
+    # NEW ✅
+for col in df.columns:
+    try:
+        df[col] = pd.to_numeric(df[col])
+    except:
+        pass
 
     # Handle missing values safely
     for col in df.columns:
