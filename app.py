@@ -16,7 +16,12 @@ df = pd.read_csv("crop_production.csv")
 
 # DATA CLEANING (Exp 9)
 df.drop_duplicates(inplace=True)
-df.fillna(method='ffill', inplace=True)
+# Handle missing values safely
+for col in df.columns:
+    if df[col].dtype == 'object':
+        df[col] = df[col].fillna(df[col].mode()[0])
+    else:
+        df[col] = df[col].fillna(df[col].mean())
 
 st.title("🌾 Crop Production Analytics Dashboard")
 
